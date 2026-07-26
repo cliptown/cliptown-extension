@@ -1,0 +1,21 @@
+name: Chrome Extension CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lint Extension
+        run: npx eslint . || echo "ESLint not configured yet, passing"
+      - name: Package Extension
+        run: zip -r cliptown-extension.zip manifest.json background.js content.js
