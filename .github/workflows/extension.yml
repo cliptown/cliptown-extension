@@ -1,4 +1,4 @@
-name: Chrome Extension CI
+name: Extension CI
 
 on:
   push:
@@ -6,16 +6,26 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  lint-and-package:
+  validate-and-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Lint Extension
-        run: npx eslint . || echo "ESLint not configured yet, passing"
-      - name: Package Extension
-        run: zip -r cliptown-extension.zip manifest.json background.js content.js
+          node-version: 22
+      - name: Validate syntax, manifest, privacy policy, and tests
+        run: npm run check
+      - name: Package reviewed extension files
+        run: |
+          mkdir -p dist
+          zip -j dist/cliptown-extension.zip manifest.json background.js content.js policy.js popup.html popup.js
+          unzip -l dist/cliptown-extension.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cliptown-extension
+          path: dist/cliptown-extension.zip
+          if-no-files-found: error

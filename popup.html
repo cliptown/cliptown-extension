@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ClipTown capture</title>
+  <style>
+    body{font:14px system-ui,sans-serif;min-width:300px;margin:0;padding:16px;background:#071229;color:#eef3ff}
+    h1{font-size:18px;margin:0 0 8px}p{color:#a9b9da;line-height:1.45}button{width:100%;margin-top:8px;padding:10px;border:0;border-radius:8px;font-weight:700;cursor:pointer}.primary{background:#2f6bff;color:white}.danger{background:#4b1730;color:#ffd5df}.secondary{background:#172746;color:#dbe6ff}#status{min-height:20px;color:#8fb1ff}
+  </style>
+</head>
+<body>
+  <h1>ClipTown draft recovery</h1>
+  <p id="site">Checking this site…</p>
+  <p>Capture is off until you enable this exact origin. Protected fields are excluded, and drafts remain in session memory until encrypted sync is implemented.</p>
+  <div id="status" role="status" aria-live="polite"></div>
+  <button id="enable" class="primary" type="button">Enable for this site</button>
+  <button id="disable" class="danger" type="button">Disable for this site</button>
+  <button id="clear" class="secondary" type="button">Clear session drafts</button>
+  <script src="popup.js"></script>
+</body>
+</html>
