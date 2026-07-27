@@ -1,6 +1,10 @@
+importScripts('background-policy.js');
+
 const ORIGINS_KEY = 'captureOrigins';
 const SESSION_DRAFTS_KEY = 'sessionDrafts';
-const MAX_SESSION_DRAFTS = 20;
+const policy = globalThis.ClipTownBackgroundPolicy;
+
+if (!policy) throw new Error('ClipTown background privacy policy was not loaded');
 
 function originPattern(origin) {
   return `${origin}/*`;
@@ -14,19 +18,21 @@ function scriptId(origin) {
 
 async function getOrigins() {
   const stored = await chrome.storage.local.get(ORIGINS_KEY);
-  return Array.isArray(stored[ORIGINS_KEY]) ? stored[ORIGINS_KEY] : [];
+  return policy.normalizeOrigins(stored[ORIGINS_KEY]);
 }
 
 async function setOrigins(origins) {
-  await chrome.storage.local.set({[ORIGINS_KEY]: [...new Set(origins)].sort()});
+  await chrome.storage.local.set({[ORIGINS_KEY]: policy.normalizeOrigins(origins)});
 }
 
 async function registerOrigin(origin) {
-  const id = scriptId(origin);
+  const normalized = policy.normalizeWebOrigin(origin);
+  if (!normalized) throw new Error('only HTTP and HTTPS origins are supported');
+  const id = scriptId(normalized);
   await chrome.scripting.unregisterContentScripts({ids: [id]}).catch(() => undefined);
   await chrome.scripting.registerContentScripts([{
     id,
-    matches: [originPattern(origin)],
+    matches: [originPattern(normalized)],
     js: ['policy.js', 'content.js'],
     runAt: 'document_idle',
     persistAcrossSessions: true,
@@ -34,38 +40,37 @@ async function registerOrigin(origin) {
 }
 
 async function enableOrigin(origin) {
-  const allowed = await chrome.permissions.contains({origins: [originPattern(origin)]});
+  const normalized = policy.normalizeWebOrigin(origin);
+  if (!normalized) throw new Error('only HTTP and HTTPS origins are supported');
+  const allowed = await chrome.permissions.contains({origins: [originPattern(normalized)]});
   if (!allowed) throw new Error('origin permission was not granted');
   const origins = await getOrigins();
-  await setOrigins([...origins, origin]);
-  await registerOrigin(origin);
+  await setOrigins([...origins, normalized]);
+  await registerOrigin(normalized);
 }
 
 async function disableOrigin(origin) {
-  await chrome.scripting.unregisterContentScripts({ids: [scriptId(origin)]}).catch(() => undefined);
-  await setOrigins((await getOrigins()).filter((value) => value !== origin));
-  await chrome.permissions.remove({origins: [originPattern(origin)]});
+  const normalized = policy.normalizeWebOrigin(origin);
+  if (!normalized) return;
+  await chrome.scripting.unregisterContentScripts({ids: [scriptId(normalized)]}).catch(() => undefined);
+  await setOrigins((await getOrigins()).filter((value) => value !== normalized));
+  await chrome.permissions.remove({origins: [originPattern(normalized)]});
 }
 
 async function stageDraft(request, sender) {
-  const tabUrl = sender.tab?.url;
-  if (!tabUrl) return {status: 'ignored'};
-  const origin = new URL(tabUrl).origin;
-  if (!(await getOrigins()).includes(origin)) return {status: 'denied'};
-  const text = String(request.text || '').slice(0, 100000);
-  if (text.trim().length < 3) return {status: 'ignored'};
+  const candidate = policy.draftCandidate(request, sender, await getOrigins());
+  if (candidate.status !== 'staged') return candidate;
 
   const stored = await chrome.storage.session.get(SESSION_DRAFTS_KEY);
   const drafts = Array.isArray(stored[SESSION_DRAFTS_KEY]) ? stored[SESSION_DRAFTS_KEY] : [];
-  drafts.unshift({
+  const draft = {
     id: crypto.randomUUID(),
-    origin,
-    reason: String(request.reason || 'unknown'),
-    fieldKind: String(request.fieldKind || 'unknown'),
-    text,
+    ...candidate.draft,
     updatedAt: new Date().toISOString(),
+  };
+  await chrome.storage.session.set({
+    [SESSION_DRAFTS_KEY]: policy.prependBoundedDraft(drafts, draft),
   });
-  await chrome.storage.session.set({[SESSION_DRAFTS_KEY]: drafts.slice(0, MAX_SESSION_DRAFTS)});
   return {status: 'staged'};
 }
 
@@ -78,8 +83,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       case 'disable_origin':
         await disableOrigin(String(request.origin));
         return {status: 'disabled'};
-      case 'origin_status':
-        return {enabled: (await getOrigins()).includes(String(request.origin))};
+      case 'origin_status': {
+        const origin = policy.normalizeWebOrigin(request.origin);
+        return {enabled: origin ? (await getOrigins()).includes(origin) : false};
+      }
       case 'clear_session_drafts':
         await chrome.storage.session.remove(SESSION_DRAFTS_KEY);
         return {status: 'cleared'};
