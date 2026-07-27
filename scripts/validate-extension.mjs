@@ -17,10 +17,14 @@ const optionalOrigins = manifest.optional_host_permissions ?? [];
 if (!optionalOrigins.includes('https://*/*') || !optionalOrigins.includes('http://*/*')) {
   fail('optional host permission patterns are missing');
 }
+if (optionalOrigins.some((origin) => !['http://*/*', 'https://*/*'].includes(origin))) {
+  fail('optional host permissions must be limited to HTTP and HTTPS');
+}
 
 for (const file of [
   manifest.background?.service_worker,
   manifest.action?.default_popup,
+  'background-policy.js',
   'background.js',
   'content.js',
   'policy.js',
@@ -29,11 +33,19 @@ for (const file of [
   if (!file || !existsSync(file)) fail(`missing referenced extension file: ${file}`);
 }
 
-const sources = ['background.js', 'content.js', 'policy.js', 'popup.js']
+const sources = ['background-policy.js', 'background.js', 'content.js', 'policy.js', 'popup.js']
   .map((file) => readFileSync(file, 'utf8'))
   .join('\n');
+const background = readFileSync('background.js', 'utf8');
+
 if (/console\.log\s*\(/.test(sources)) fail('plaintext console logging is forbidden');
 if (/<all_urls>/.test(sources) || /save_draft/.test(sources)) fail('legacy unconditional capture code remains');
 if (!/storage\.session/.test(sources)) fail('drafts must remain session-scoped until encrypted persistence exists');
+if (!/importScripts\(['"]background-policy\.js['"]\)/.test(background)) {
+  fail('background worker must load the reviewed background privacy policy');
+}
+if (!/incognito/.test(sources)) fail('incognito capture must be explicitly rejected');
+if (!/normalizeWebOrigin/.test(sources)) fail('background origin handling must be normalized and protocol-bounded');
+if (!/MAX_SESSION_DRAFTS/.test(sources)) fail('session retention must remain explicitly bounded');
 
 console.log('Extension manifest and privacy contract validated.');
