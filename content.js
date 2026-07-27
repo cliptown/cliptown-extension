@@ -1,30 +1,37 @@
-// Cliptown Content Script
+(() => {
+  if (globalThis.__cliptownDraftRecoveryLoaded) return;
+  globalThis.__cliptownDraftRecoveryLoaded = true;
 
-let debounceTimer;
-const DEBOUNCE_MS = 2000; // Save 2 seconds after typing stops
+  const policy = globalThis.ClipTownCapturePolicy;
+  if (!policy) throw new Error('ClipTown capture policy was not loaded');
 
-function saveToCliptown(text) {
-    if (!text || text.length < 3) return; // Ignore very short text
-    chrome.runtime.sendMessage({ action: 'save_draft', text: text });
-}
+  const timers = new WeakMap();
+  const DEBOUNCE_MS = 1500;
 
-// Track keyup events
-document.addEventListener('keyup', (e) => {
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable) {
-        // Skip password fields
-        if (e.target.type === 'password') return;
+  function stage(element, reason) {
+    const text = policy.extractDraft(element);
+    if (!text) return;
+    chrome.runtime.sendMessage({
+      action: 'stage_draft',
+      reason,
+      text,
+      fieldKind: element.isContentEditable ? 'contenteditable' : String(element.tagName).toLowerCase(),
+    }).catch(() => undefined);
+  }
 
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            saveToCliptown(e.target.value || e.target.innerText);
-        }, DEBOUNCE_MS);
-    }
-});
+  document.addEventListener('input', (event) => {
+    const element = event.target;
+    if (!policy.isEditable(element) || policy.isProtected(element)) return;
+    const previous = timers.get(element);
+    if (previous) clearTimeout(previous);
+    timers.set(element, setTimeout(() => stage(element, 'idle'), DEBOUNCE_MS));
+  }, true);
 
-// Track blur events (when user clicks away from a field)
-document.addEventListener('blur', (e) => {
-    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.isContentEditable) {
-        if (e.target.type === 'password') return;
-        saveToCliptown(e.target.value || e.target.innerText);
-    }
-}, true);
+  document.addEventListener('blur', (event) => {
+    const element = event.target;
+    if (!policy.isEditable(element) || policy.isProtected(element)) return;
+    const previous = timers.get(element);
+    if (previous) clearTimeout(previous);
+    stage(element, 'blur');
+  }, true);
+})();
