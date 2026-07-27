@@ -1,16 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Cliptown Auto-Save",
-  "version": "1.0",
-  "description": "Automatically saves draft text securely to your Cliptown clipboard.",
-  "permissions": ["storage", "clipboardRead", "clipboardWrite", "activeTab"],
+  "name": "ClipTown Draft Recovery",
+  "version": "0.1.0",
+  "description": "Consent-based, local draft recovery for selected sites while ClipTown encrypted sync is under development.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
-    }
-  ]
+  "action": {
+    "default_title": "ClipTown capture settings",
+    "default_popup": "popup.html"
+  }
 }
