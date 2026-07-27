@@ -25,7 +25,7 @@ jobs:
           zip -j dist/cliptown-extension.zip manifest.json background-policy.js background.js content.js policy.js popup.html popup.js
           unzip -l dist/cliptown-extension.zip | tee dist/archive-contents.txt
           grep -q 'background-policy.js' dist/archive-contents.txt
-          test "$(unzip -Z1 dist/cliptown-extension.zip | wc -l)" -eq 8
+          test "$(unzip -Z1 dist/cliptown-extension.zip | wc -l)" -eq 7
       - uses: actions/upload-artifact@v4
         with:
           name: cliptown-extension
