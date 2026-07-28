@@ -5,6 +5,7 @@
 })(globalThis, function createPolicy() {
   const MAX_DRAFT_CHARS = 100000;
   const PROTECTED_AUTOCOMPLETE = /(?:^|\s)(?:cc-|current-password|new-password|one-time-code|webauthn)/i;
+  const PROTECTED_LABEL = /(?:password|passcode|otp|one.?time|credit.?card|card.?number|cvv|cvc|social.?security|ssn|tax.?id|routing.?number|bank.?account|private.?key|seed.?phrase|recovery.?code)/i;
   const ALLOWED_INPUT_TYPES = new Set(['text', 'search', 'url']);
 
   function isEditable(element) {
@@ -18,8 +19,20 @@
   function isProtected(element) {
     const type = String(element?.type || '').toLowerCase();
     const autocomplete = String(element?.autocomplete || '');
-    const name = `${element?.name || ''} ${element?.id || ''}`;
-    return type === 'password' || PROTECTED_AUTOCOMPLETE.test(autocomplete) || /(?:password|passcode|otp|one.?time|credit.?card|card.?number|cvv|cvc)/i.test(name);
+    const label = [
+      element?.name,
+      element?.id,
+      element?.ariaLabel,
+      element?.placeholder,
+    ].map((value) => String(value || '')).join(' ');
+    const explicitlyIgnored = element?.dataset?.cliptownIgnore != null ||
+      element?.dataset?.private != null ||
+      element?.getAttribute?.('data-cliptown-ignore') != null ||
+      element?.getAttribute?.('data-private') != null;
+    return explicitlyIgnored ||
+      type === 'password' ||
+      PROTECTED_AUTOCOMPLETE.test(autocomplete) ||
+      PROTECTED_LABEL.test(label);
   }
 
   function extractDraft(element) {
