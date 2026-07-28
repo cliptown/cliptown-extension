@@ -6,29 +6,41 @@ Consent-based local draft recovery for selected web origins.
 
 - No site is captured until the user grants permission for that exact HTTP or HTTPS origin.
 - Content scripts are registered dynamically after consent; there is no declared `<all_urls>` content script.
-- Password, payment-card, one-time-code, passcode, disabled, read-only, and unsupported input fields are excluded.
+- Managed `captureDeniedOrigins` policy overrides stored user consent and prevents script registration after browser restart.
+- Password, payment-card, one-time-code, passcode, identity, banking, private-key, seed-phrase, and recovery-code fields are excluded.
+- Pages can opt sensitive editors out with `data-cliptown-ignore` or `data-private`.
 - Incognito tab senders are rejected again at the background-worker boundary, even if the user previously enabled the same ordinary origin.
 - Credential-bearing, malformed, browser-internal, file, FTP, and other non-web origins are rejected.
+- Navigation never inherits consent: every staged message is checked against the sender tab's current exact origin.
 - Draft reason and field-kind metadata are limited to reviewed values; unknown metadata is normalized rather than trusted.
 - Plaintext is bounded to 100,000 characters and session retention is capped at the newest 20 drafts.
-- Drafts are staged only in `chrome.storage.session`.
+- Each origin is limited to 12 staged drafts in a rolling 60-second window.
+- Drafts and rate-limit state are staged only in `chrome.storage.session`; users can clear all session drafts or one origin's drafts.
 - Plaintext drafts are not logged, persisted to disk, or synchronized while end-device encryption is unfinished.
 
 The extension must not add persistent or remote storage until `cliptown-clients` exposes reviewed TypeScript encryption and authenticated sync integration.
 
+## Managed policy
+
+Administrators may provide an array of exact HTTP/HTTPS origins through the managed-storage key `captureDeniedOrigins`. Managed denial is fail-closed at enablement, message staging, origin status, and browser-startup script registration. It does not grant access to any origin and requires no additional extension permission.
+
 ## Privacy regression matrix
 
-The pure background policy tests cover:
+The pure foreground and background policy tests cover:
 
 - HTTP/HTTPS normalization and exact-origin comparison;
 - rejection of credential-bearing and unsupported URLs;
 - rejection of incognito senders;
-- denial for non-enabled origins;
+- denial for non-enabled and managed origins;
+- navigation to a different origin after consent;
+- deterministic disable/re-enable and restart registration state;
+- rolling per-origin rate limits without cross-origin interference;
+- per-origin deletion of session drafts and rate events;
 - bounded plaintext and session retention;
 - known idle/blur reasons and input/textarea/contenteditable field kinds;
-- normalization of unexpected metadata.
+- protected labels, placeholders, page exclusion markers, and unexpected metadata.
 
-These checks are defense in depth. The content-script protected-field policy remains a separate gate and is also tested.
+These checks are defense in depth. Persistent encrypted recovery, authenticated sync, audit events, and store publication remain separate gated work.
 
 ## Validation
 

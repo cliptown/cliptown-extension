@@ -44,6 +44,23 @@ test('deduplicates, sorts, and drops unsupported stored origins', () => {
   );
 });
 
+test('managed deny rules override stored consent and restart registration', () => {
+  const stored = ['https://allowed.example', 'https://blocked.example/path'];
+  const denied = ['https://blocked.example'];
+  assert.deepEqual(policy.effectiveOrigins(stored, denied), ['https://allowed.example']);
+  assert.deepEqual(policy.addOrigin(stored, 'https://blocked.example/editor', denied), [
+    'https://allowed.example',
+    'https://blocked.example',
+  ]);
+});
+
+test('origin disable and re-enable operations remain normalized and deterministic', () => {
+  const enabled = policy.addOrigin([], 'https://Example.com/editor');
+  assert.deepEqual(enabled, ['https://example.com']);
+  assert.deepEqual(policy.removeOrigin(enabled, 'https://example.com/other'), []);
+  assert.deepEqual(policy.addOrigin([], 'file:///tmp/draft'), []);
+});
+
 test('rejects incognito senders even when the origin is enabled', () => {
   assert.deepEqual(
     policy.draftCandidate(
@@ -55,7 +72,7 @@ test('rejects incognito senders even when the origin is enabled', () => {
   );
 });
 
-test('rejects unsupported and non-enabled origins', () => {
+test('rejects unsupported, navigated, non-enabled, and managed origins', () => {
   assert.deepEqual(
     policy.draftCandidate(request(), sender('chrome://settings'), ['https://example.com']),
     {status: 'ignored', reason: 'unsupported-origin'},
@@ -63,6 +80,15 @@ test('rejects unsupported and non-enabled origins', () => {
   assert.deepEqual(
     policy.draftCandidate(request(), sender('https://other.example/editor'), ['https://example.com']),
     {status: 'denied', reason: 'origin-not-enabled'},
+  );
+  assert.deepEqual(
+    policy.draftCandidate(
+      request(),
+      sender('https://example.com/editor'),
+      ['https://example.com'],
+      ['https://example.com'],
+    ),
+    {status: 'denied', reason: 'managed-policy'},
   );
 });
 
@@ -114,4 +140,37 @@ test('bounds session draft retention to the newest twenty records', () => {
   assert.equal(result.length, policy.MAX_SESSION_DRAFTS);
   assert.equal(result[0].id, 'new');
   assert.equal(result.at(-1).id, 'old-18');
+});
+
+test('rate limits one origin without blocking another and expires old events', () => {
+  const now = 1_000_000;
+  let events = [];
+  for (let index = 0; index < policy.MAX_DRAFTS_PER_ORIGIN_WINDOW; index += 1) {
+    const decision = policy.rateLimitDecision(events, 'https://example.com', now - 1000 + index);
+    assert.equal(decision.allowed, true);
+    events = decision.events;
+  }
+
+  const limited = policy.rateLimitDecision(events, 'https://example.com', now);
+  assert.equal(limited.allowed, false);
+  assert.equal(
+    policy.rateLimitDecision(events, 'https://other.example', now).allowed,
+    true,
+  );
+  assert.equal(
+    policy.rateLimitDecision(events, 'https://example.com', now + policy.RATE_LIMIT_WINDOW_MS + 1).allowed,
+    true,
+  );
+});
+
+test('clear-origin policy removes only matching session drafts and rate events', () => {
+  const records = [
+    {origin: 'https://example.com', id: 'a'},
+    {origin: 'https://other.example', id: 'b'},
+    {origin: 'https://example.com/path', id: 'c'},
+  ];
+  assert.deepEqual(policy.clearOriginRecords(records, 'https://example.com/editor'), [
+    {origin: 'https://other.example', id: 'b'},
+  ]);
+  assert.deepEqual(policy.clearOriginRecords(undefined, 'https://example.com'), []);
 });
