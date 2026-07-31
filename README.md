@@ -7,7 +7,7 @@ Consent-based local draft recovery for selected web origins.
 - No site is captured until the user grants permission for that exact HTTP or HTTPS origin.
 - Content scripts are registered dynamically after consent; there is no declared `<all_urls>` content script.
 - Managed `captureDeniedOrigins` policy overrides stored user consent and prevents script registration after browser restart.
-- Password, payment-card, one-time-code, passcode, identity, banking, private-key, seed-phrase, and recovery-code fields are excluded.
+- Password, payment-card, one-time-code, passcode, identity, banking, private-key, seed-phrase, and recovery-code fields are excluded, as are disabled, read-only, and unsupported input fields.
 - Pages can opt sensitive editors out with `data-cliptown-ignore` or `data-private`.
 - Incognito tab senders are rejected again at the background-worker boundary, even if the user previously enabled the same ordinary origin.
 - Credential-bearing, malformed, browser-internal, file, FTP, and other non-web origins are rejected.
