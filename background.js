@@ -202,35 +202,39 @@ async function hasHostPermission(origin) {
 // Single source of truth for "which origins may currently have a content script".
 // Runs on startup, on install/update, when managed policy changes, and when the
 // user revokes a host permission from chrome://extensions.
-async function syncRegistrations() {
-  const stored = await getOrigins();
-  const denied = new Set(await getManagedDeniedOrigins());
+function syncRegistrations() {
+  return withRegistrationLock(async () => {
+    const stored = await getOrigins();
+    const denied = new Set(await getManagedDeniedOrigins());
 
-  const stillGranted = [];
-  for (const origin of stored) {
-    if (await hasHostPermission(origin)) stillGranted.push(origin);
-  }
-  // A revoked host permission is an explicit withdrawal of consent, so forget it.
-  if (stillGranted.length !== stored.length) await setOrigins(stillGranted);
+    const stillGranted = [];
+    for (const origin of stored) {
+      if (await hasHostPermission(origin)) stillGranted.push(origin);
+    }
+    // A revoked host permission is an explicit withdrawal of consent, so forget it.
+    if (stillGranted.length !== stored.length) await setOrigins(stillGranted);
 
-  const wanted = new Map(
-    stillGranted.filter((origin) => !denied.has(origin)).map((origin) => [scriptId(origin), origin]),
-  );
+    const wanted = new Map(
+      stillGranted
+        .filter((origin) => !denied.has(origin))
+        .map((origin) => [scriptId(origin), origin]),
+    );
 
-  const registered = await chrome.scripting.getRegisteredContentScripts().catch(() => []);
-  const stale = registered
-    .map((script) => script?.id)
-    .filter((id) => typeof id === 'string' && id.startsWith(SCRIPT_ID_PREFIX) && !wanted.has(id));
-  if (stale.length) {
-    await chrome.scripting.unregisterContentScripts({ids: stale}).catch(() => undefined);
-  }
+    const registered = await chrome.scripting.getRegisteredContentScripts().catch(() => []);
+    const stale = registered
+      .map((script) => script?.id)
+      .filter((id) => typeof id === 'string' && id.startsWith(SCRIPT_ID_PREFIX) && !wanted.has(id));
+    if (stale.length) {
+      await chrome.scripting.unregisterContentScripts({ids: stale}).catch(() => undefined);
+    }
 
-  for (const origin of wanted.values()) await registerOrigin(origin).catch(() => undefined);
+    for (const origin of wanted.values()) await registerOrigin(origin).catch(() => undefined);
 
-  // Managed denial must not leave already-staged plaintext behind.
-  for (const origin of stored) {
-    if (denied.has(origin)) await clearOriginDrafts(origin);
-  }
+    // Managed denial must not leave already-staged plaintext behind.
+    for (const origin of stored) {
+      if (denied.has(origin)) await clearOriginDrafts(origin);
+    }
+  });
 }
 
 chrome.runtime.onStartup.addListener(() => {
