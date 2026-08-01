@@ -83,27 +83,31 @@ async function unregisterOrigin(origin) {
   await chrome.scripting.unregisterContentScripts({ids: [scriptId(normalized)]}).catch(() => undefined);
 }
 
-async function enableOrigin(origin) {
+function enableOrigin(origin) {
   const normalized = policy.normalizeWebOrigin(origin);
   if (!normalized) throw new Error('only HTTP and HTTPS origins are supported');
-  if ((await getManagedDeniedOrigins()).includes(normalized)) {
-    throw new Error('origin is disabled by managed policy');
-  }
-  const allowed = await chrome.permissions.contains({origins: [originPattern(normalized)]});
-  if (!allowed) throw new Error('origin permission was not granted');
-  await setOrigins(policy.addOrigin(await getOrigins(), normalized));
-  await registerOrigin(normalized);
+  return withRegistrationLock(async () => {
+    if ((await getManagedDeniedOrigins()).includes(normalized)) {
+      throw new Error('origin is disabled by managed policy');
+    }
+    const allowed = await chrome.permissions.contains({origins: [originPattern(normalized)]});
+    if (!allowed) throw new Error('origin permission was not granted');
+    await setOrigins(policy.addOrigin(await getOrigins(), normalized));
+    await registerOrigin(normalized);
+  });
 }
 
-async function disableOrigin(origin) {
+function disableOrigin(origin) {
   const normalized = policy.normalizeWebOrigin(origin);
-  if (!normalized) return;
-  await unregisterOrigin(normalized);
-  await setOrigins(policy.removeOrigin(await getOrigins(), normalized));
-  await clearOriginDrafts(normalized);
-  // Capture has already stopped; a failure to hand the host permission back
-  // must not report the disable itself as failed.
-  await chrome.permissions.remove({origins: [originPattern(normalized)]}).catch(() => undefined);
+  if (!normalized) return Promise.resolve();
+  return withRegistrationLock(async () => {
+    await unregisterOrigin(normalized);
+    await setOrigins(policy.removeOrigin(await getOrigins(), normalized));
+    await clearOriginDrafts(normalized);
+    // Capture has already stopped; a failure to hand the host permission back
+    // must not report the disable itself as failed.
+    await chrome.permissions.remove({origins: [originPattern(normalized)]}).catch(() => undefined);
+  });
 }
 
 function stageDraft(request, sender) {
