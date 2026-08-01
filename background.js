@@ -4,18 +4,33 @@ const ORIGINS_KEY = 'captureOrigins';
 const ADMIN_DENIED_ORIGINS_KEY = 'captureDeniedOrigins';
 const SESSION_DRAFTS_KEY = 'sessionDrafts';
 const RATE_EVENTS_KEY = 'draftRateEvents';
+const SCRIPT_ID_PREFIX = 'cliptown_';
 const policy = globalThis.ClipTownBackgroundPolicy;
 
 if (!policy) throw new Error('ClipTown background privacy policy was not loaded');
+
+// Drafts must never be readable from a content script, even if a future Chromium
+// release changes the default session-storage access level.
+chrome.storage.session.setAccessLevel?.({accessLevel: 'TRUSTED_CONTEXTS'}).catch(() => undefined);
+
+// Session reads and writes are read-modify-write, so concurrent messages must not interleave.
+let sessionQueue = Promise.resolve();
+
+function withSessionLock(task) {
+  const result = sessionQueue.then(task, task);
+  sessionQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 function originPattern(origin) {
   return `${origin}/*`;
 }
 
+// Collision-free by construction: a hash would let two origins share one registration.
 function scriptId(origin) {
-  let hash = 5381;
-  for (const character of origin) hash = ((hash << 5) + hash) ^ character.charCodeAt(0);
-  return `cliptown_${(hash >>> 0).toString(16)}`;
+  let encoded = '';
+  for (const character of origin) encoded += character.codePointAt(0).toString(16).padStart(4, '0');
+  return `${SCRIPT_ID_PREFIX}${encoded}`;
 }
 
 async function getOrigins() {
