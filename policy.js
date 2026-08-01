@@ -71,21 +71,11 @@
 
   function isProtected(element) {
     const type = String(element?.type || '').toLowerCase();
-    const autocomplete = String(element?.autocomplete || '');
-    const label = [
-      element?.name,
-      element?.id,
-      element?.ariaLabel,
-      element?.placeholder,
-    ].map((value) => String(value || '')).join(' ');
-    const explicitlyIgnored = element?.dataset?.cliptownIgnore != null ||
-      element?.dataset?.private != null ||
-      element?.getAttribute?.('data-cliptown-ignore') != null ||
-      element?.getAttribute?.('data-private') != null;
-    return explicitlyIgnored ||
+    const autocomplete = String(element?.autocomplete ?? attribute(element, 'autocomplete') ?? '');
+    return isExcludedByMarker(element) ||
       type === 'password' ||
       PROTECTED_AUTOCOMPLETE.test(autocomplete) ||
-      PROTECTED_LABEL.test(label);
+      PROTECTED_LABEL.test(describingText(element));
   }
 
   function extractDraft(element) {
