@@ -14,7 +14,8 @@
 import {test as base, expect} from '@playwright/test';
 import {chromium} from '@playwright/test';
 import {createServer} from 'node:http';
-import {readFile, mkdtemp, writeFile, cp, rm} from 'node:fs/promises';
+import {readFile, mkdtemp, writeFile, cp, rm, realpath} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {dirname, join, normalize} from 'node:path';
 import {tmpdir} from 'node:os';
