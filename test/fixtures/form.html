@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ClipTown capture fixture</title>
+</head>
+<body>
+  <h1>Draft recovery fixture</h1>
+
+  <!-- Ordinary field: MUST be captured. -->
+  <p>
+    <label for="notes">Message notes</label>
+    <textarea id="notes" name="notes" rows="4"></textarea>
+  </p>
+
+  <!-- Ordinary field used to order assertions after a protected field. -->
+  <p>
+    <label for="canary">Follow up</label>
+    <textarea id="canary" name="followup" rows="2"></textarea>
+  </p>
+
+  <!-- type=password: MUST NOT be captured. -->
+  <p>
+    <label for="account-password">Account password</label>
+    <input id="account-password" name="account-password" type="password">
+  </p>
+
+  <!-- Protected only by its associated <label> text. Neither the id nor the
+       name matches the protected-label pattern, so this field proves the
+       capture policy reads the label a human actually sees. -->
+  <p>
+    <label for="pin">Recovery code</label>
+    <input id="pin" name="pin" type="text">
+  </p>
+
+  <!-- Protected only by aria-labelledby. -->
+  <p>
+    <span id="bank-label">Bank account number</span>
+    <input id="aria-secret" name="acct" type="text" aria-labelledby="bank-label">
+  </p>
+
+  <!-- Protected by a wrapping <label> rather than an association. -->
+  <p>
+    <label>Card number
+      <input id="wrapped-card" name="pan" type="text">
+    </label>
+  </p>
+
+  <!-- Explicit page opt-out on the field itself. -->
+  <p>
+    <label for="ignored">Private scratch pad</label>
+    <textarea id="ignored" name="scratch" data-cliptown-ignore rows="2"></textarea>
+  </p>
+
+  <!-- Explicit page opt-out on an ancestor: rich editors are usually wrapped. -->
+  <section data-private>
+    <h2>Confidential editor</h2>
+    <div id="wrapped-editor" contenteditable="true" role="textbox" aria-label="Confidential editor"></div>
+  </section>
+
+  <!-- Ordinary contenteditable: MUST be captured. -->
+  <div id="open-editor" contenteditable="true" role="textbox" aria-label="Public editor"></div>
+
+  <!-- Unsupported input type: MUST NOT be captured. -->
+  <p>
+    <label for="phone">Phone</label>
+    <input id="phone" name="phone" type="tel">
+  </p>
+
+  <!-- Read-only field: MUST NOT be captured. -->
+  <p>
+    <label for="readonly-note">Archived note</label>
+    <input id="readonly-note" name="archived" type="text" readonly>
+  </p>
+
+  <button id="elsewhere" type="button">Move focus here</button>
+</body>
+</html>
