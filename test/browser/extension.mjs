@@ -37,6 +37,11 @@ const CONTENT_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascr
 async function startFixtureServer() {
   const server = createServer(async (request, response) => {
     const path = normalize(new URL(request.url, 'http://localhost').pathname).replace(/^(\.\.[/\\])+/, '');
+    if (path === '/favicon.ico') {
+      // Chromium requests this unprompted; a 404 would pollute console-error assertions.
+      response.writeHead(204).end();
+      return;
+    }
     const file = join(fixtureDir, path === '/' ? 'form.html' : path);
     if (!file.startsWith(fixtureDir)) {
       response.writeHead(403).end('forbidden');
