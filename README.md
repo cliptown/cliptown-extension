@@ -47,10 +47,40 @@ The pure foreground and background policy tests cover:
 
 These checks are defense in depth. Persistent encrypted recovery, authenticated sync, audit events, and store publication remain separate gated work.
 
+## Real-browser privacy tests
+
+The pure policy tests above prove the rules; they cannot prove the extension is wired to them.
+`test/browser/capture.spec.mjs` launches Chromium with the unpacked extension in a Playwright
+persistent context, against a static fixture form served over HTTP from `test/fixtures/`, and
+asserts against the live `chrome.storage.session` contents that:
+
+- an ordinary textarea is captured on blur and an ordinary contenteditable on the idle debounce;
+- staged plaintext never appears in `chrome.storage.local` or `chrome.storage.sync`;
+- a password field, a field protected only by its associated `<label>`, one protected only by
+  `aria-labelledby`, one protected only by a wrapping `<label>`, a `data-cliptown-ignore` field, a
+  `data-private` **ancestor**, an unsupported input type, and a read-only field all stage nothing,
+  while an ordinary field edited afterwards does stage — so the negative result is ordered, not timed;
+- no content script exists before consent, and an origin without consent stages nothing even when
+  the real capture scripts are force-injected into it;
+- withdrawing consent stops an already-running content script and discards its staged drafts;
+- a content script cannot clear drafts, grant consent, or revoke consent;
+- the popup renders its controls with no console or page errors.
+
+Because `chrome.permissions.request()` is a browser-native prompt that automation cannot click, the
+harness copies the extension to a temp directory and lists the two fixture origins under
+`host_permissions`; every other file, and the whole consent/registration/staging path, is the
+shipped code. Managed-policy denial is covered by the unit tests only, because `chrome.storage.managed`
+is fed by enterprise policy files that cannot be provisioned hermetically in CI.
+
 ## Validation
 
 ```sh
-npm run check
+npm ci
+npm run check       # syntax, manifest, privacy contract, unit tests
+npx playwright install --with-deps chromium
+npm run test:browser  # real Chromium with the unpacked extension
 ```
 
-CI validates Manifest V3 permissions, referenced files, JavaScript syntax, foreground and background privacy policies, protected-field tests, and the packaged ZIP contents.
+CI validates Manifest V3 permissions, referenced files, JavaScript syntax, foreground and background
+privacy policies, protected-field tests, the packaged ZIP contents, and the real-browser privacy
+suite on every push and pull request.
