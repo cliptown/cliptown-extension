@@ -68,16 +68,89 @@ async function startFixtureServer() {
   };
 }
 
+/**
+ * Chromium derives an unpacked extension's id from the absolute directory path:
+ * the first 16 bytes of its SHA-256, with each hex digit mapped 0-f to a-p.
+ * Knowing the id up front lets the harness restart a terminated MV3 worker.
+ */
+function unpackedExtensionId(absolutePath) {
+  const digest = createHash('sha256').update(absolutePath, 'utf8').digest('hex').slice(0, 32);
+  return [...digest].map((digit) => String.fromCharCode(97 + parseInt(digit, 16))).join('');
+}
+
 /** Copy the shipped extension, adding only the fixture origins as host permissions. */
 async function buildUnpackedExtension(origins) {
-  const directory = await mkdtemp(join(tmpdir(), 'cliptown-ext-'));
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'cliptown-ext-')));
   for (const file of EXTENSION_FILES) {
     await cp(join(repoRoot, file), join(directory, file));
   }
   const manifest = JSON.parse(await readFile(join(repoRoot, 'manifest.json'), 'utf8'));
   manifest.host_permissions = origins.map((origin) => `${origin}/*`);
   await writeFile(join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  return directory;
+  return {directory, id: unpackedExtensionId(directory)};
+}
+
+const WORKER_GONE = /target.*closed|has been closed|execution context was destroyed|worker was destroyed/i;
+
+/**
+ * A stable handle to the extension's MV3 service worker.
+ *
+ * The worker is evicted after ~30s idle, so a plain Playwright Worker reference
+ * goes stale mid-test. This re-resolves it — restarting it through an extension
+ * page when Chromium has stopped it — so tests observe the extension's real
+ * lifecycle instead of racing it.
+ */
+class BackgroundWorker {
+  constructor(context, extensionId) {
+    this.context = context;
+    this.extensionId = extensionId;
+    this.current = null;
+  }
+
+  #find() {
+    return this.context
+      .serviceWorkers()
+      .find((worker) => worker.url().startsWith(`chrome-extension://${this.extensionId}/`));
+  }
+
+  async resolve() {
+    if (this.current) return this.current;
+
+    let worker = this.#find();
+    if (!worker) {
+      const waker = await this.context.newPage();
+      const started = this.context.waitForEvent('serviceworker', {timeout: 20_000}).catch(() => null);
+      await waker.goto(`chrome-extension://${this.extensionId}/popup.html`).catch(() => undefined);
+      // A runtime message is the documented way to start a stopped worker.
+      await waker
+        .evaluate(() => chrome.runtime.sendMessage({action: 'origin_status', origin: 'https://wake.invalid'}))
+        .catch(() => undefined);
+      worker = this.#find() ?? (await started);
+      await waker.close().catch(() => undefined);
+    }
+    if (!worker) throw new Error('extension service worker never started');
+
+    worker.once('close', () => {
+      if (this.current === worker) this.current = null;
+    });
+    this.current = worker;
+    return worker;
+  }
+
+  async evaluate(fn, arg) {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const worker = await this.resolve();
+      try {
+        return await worker.evaluate(fn, arg);
+      } catch (error) {
+        if (!WORKER_GONE.test(String(error?.message ?? error))) throw error;
+        lastError = error;
+        this.current = null;
+      }
+    }
+    throw lastError;
+  }
 }
 
 export const test = base.extend({
