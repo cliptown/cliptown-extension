@@ -137,6 +137,7 @@
     MAX_DRAFTS_PER_ORIGIN_WINDOW,
     normalizeWebOrigin,
     normalizeOrigins,
+    senderOrigin,
     effectiveOrigins,
     addOrigin,
     removeOrigin,
