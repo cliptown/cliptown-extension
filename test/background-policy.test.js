@@ -92,6 +92,43 @@ test('rejects unsupported, navigated, non-enabled, and managed origins', () => {
   );
 });
 
+test('rejects subframe senders and frame/tab origin mismatches', () => {
+  const allowed = ['https://example.com'];
+
+  assert.deepEqual(
+    policy.draftCandidate(request(), {...sender(), frameId: 3}, allowed),
+    {status: 'denied', reason: 'subframe'},
+  );
+  assert.deepEqual(
+    policy.draftCandidate(request(), {...sender(), url: 'https://evil.example/frame'}, allowed),
+    {status: 'denied', reason: 'origin-mismatch'},
+  );
+  assert.deepEqual(
+    policy.draftCandidate(request(), {...sender(), url: 'about:blank'}, allowed),
+    {status: 'ignored', reason: 'unsupported-origin'},
+  );
+
+  const matched = policy.draftCandidate(
+    request(),
+    {...sender(), url: 'https://example.com/editor', frameId: 0},
+    allowed,
+  );
+  assert.equal(matched.status, 'staged');
+  assert.equal(matched.draft.origin, 'https://example.com');
+});
+
+test('resolves the sending document origin ahead of the tab origin', () => {
+  assert.deepEqual(
+    policy.senderOrigin({url: 'https://example.com/editor', tab: {url: 'https://example.com/other'}}),
+    {origin: 'https://example.com', reason: 'unsupported-origin'},
+  );
+  assert.equal(
+    policy.senderOrigin({url: 'https://a.example/x', tab: {url: 'https://b.example/y'}}).origin,
+    null,
+  );
+  assert.equal(policy.senderOrigin({tab: {url: 'https://example.com'}}).origin, 'https://example.com');
+});
+
 test('stages bounded drafts with normalized metadata for enabled origins', () => {
   const result = policy.draftCandidate(
     request({

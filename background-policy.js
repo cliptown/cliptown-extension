@@ -45,11 +45,31 @@
     return normalizeOrigins(origins).filter((item) => item !== origin);
   }
 
+  function senderOrigin(sender) {
+    const frameUrl = typeof sender?.url === 'string' ? sender.url : '';
+    const frameOrigin = frameUrl ? normalizeWebOrigin(frameUrl) : null;
+    if (frameUrl && !frameOrigin) return {origin: null, reason: 'unsupported-origin'};
+
+    const tabOrigin = normalizeWebOrigin(sender?.tab?.url);
+    if (frameOrigin && tabOrigin && frameOrigin !== tabOrigin) {
+      return {origin: null, reason: 'origin-mismatch'};
+    }
+    return {origin: frameOrigin || tabOrigin, reason: 'unsupported-origin'};
+  }
+
   function draftCandidate(request, sender, allowedOrigins, deniedOrigins = []) {
     if (sender?.tab?.incognito === true) return {status: 'denied', reason: 'incognito'};
+    if (Number.isFinite(Number(sender?.frameId)) && Number(sender.frameId) !== 0) {
+      return {status: 'denied', reason: 'subframe'};
+    }
 
-    const origin = normalizeWebOrigin(sender?.tab?.url);
-    if (!origin) return {status: 'ignored', reason: 'unsupported-origin'};
+    const resolved = senderOrigin(sender);
+    const origin = resolved.origin;
+    if (!origin) {
+      return resolved.reason === 'origin-mismatch'
+        ? {status: 'denied', reason: 'origin-mismatch'}
+        : {status: 'ignored', reason: 'unsupported-origin'};
+    }
     if (normalizeOrigins(deniedOrigins).includes(origin)) {
       return {status: 'denied', reason: 'managed-policy'};
     }
@@ -117,6 +137,7 @@
     MAX_DRAFTS_PER_ORIGIN_WINDOW,
     normalizeWebOrigin,
     normalizeOrigins,
+    senderOrigin,
     effectiveOrigins,
     addOrigin,
     removeOrigin,

@@ -37,6 +37,7 @@ const sources = ['background-policy.js', 'background.js', 'content.js', 'policy.
   .map((file) => readFileSync(file, 'utf8'))
   .join('\n');
 const background = readFileSync('background.js', 'utf8');
+const capturePolicy = readFileSync('policy.js', 'utf8');
 
 if (/console\.log\s*\(/.test(sources)) fail('plaintext console logging is forbidden');
 if (/<all_urls>/.test(sources) || /save_draft/.test(sources)) fail('legacy unconditional capture code remains');
@@ -47,5 +48,20 @@ if (!/importScripts\(['"]background-policy\.js['"]\)/.test(background)) {
 if (!/incognito/.test(sources)) fail('incognito capture must be explicitly rejected');
 if (!/normalizeWebOrigin/.test(sources)) fail('background origin handling must be normalized and protocol-bounded');
 if (!/MAX_SESSION_DRAFTS/.test(sources)) fail('session retention must remain explicitly bounded');
+if (!/untrusted-sender/.test(background)) {
+  fail('privileged background actions must reject content-script senders');
+}
+if (!/TRUSTED_CONTEXTS/.test(background)) {
+  fail('staged drafts must stay restricted to trusted extension contexts');
+}
+if (!/permissions\.onRemoved/.test(background)) {
+  fail('revoked host permissions must unregister capture');
+}
+if (!/closest/.test(capturePolicy)) {
+  fail('capture policy must honor exclusion markers on ancestor elements');
+}
+if (!/labels/.test(capturePolicy) || !/aria-labelledby/.test(capturePolicy)) {
+  fail('capture policy must inspect the label a user actually sees');
+}
 
 console.log('Extension manifest and privacy contract validated.');
