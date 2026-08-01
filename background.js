@@ -136,8 +136,20 @@ function clearOriginDrafts(origin) {
   });
 }
 
+// Only extension-owned pages (the popup) may change consent or read/clear staged drafts.
+// A content script is untrusted for anything except offering its own draft.
+function isTrustedExtensionPage(sender) {
+  if (sender?.id !== chrome.runtime.id) return false;
+  if (sender?.tab) return false;
+  return typeof sender?.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   const operation = (async () => {
+    if (sender?.id !== chrome.runtime.id) return {status: 'ignored'};
+    if (request?.action !== 'stage_draft' && !isTrustedExtensionPage(sender)) {
+      return {status: 'denied', reason: 'untrusted-sender'};
+    }
     switch (request?.action) {
       case 'enable_origin':
         await enableOrigin(String(request.origin));
