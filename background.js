@@ -19,18 +19,16 @@ let sessionQueue = Promise.resolve();
 // race a user enable/disable and leave a stale or missing content script.
 let registrationQueue = Promise.resolve();
 
-function serialize(queue, task) {
-  const result = queue().then(task, task);
-  queue(result.then(() => undefined, () => undefined));
+function withSessionLock(task) {
+  const result = sessionQueue.then(task, task);
+  sessionQueue = result.then(() => undefined, () => undefined);
   return result;
 }
 
-function withSessionLock(task) {
-  return serialize((next) => (next ? (sessionQueue = next) : sessionQueue), task);
-}
-
 function withRegistrationLock(task) {
-  return serialize((next) => (next ? (registrationQueue = next) : registrationQueue), task);
+  const result = registrationQueue.then(task, task);
+  registrationQueue = result.then(() => undefined, () => undefined);
+  return result;
 }
 
 function originPattern(origin) {
