@@ -163,40 +163,44 @@ export const test = base.extend({
     {scope: 'worker'},
   ],
 
-  context: async ({fixtureServer}, use, testInfo) => {
-    const extensionDir = await buildUnpackedExtension([
+  unpackedExtension: async ({fixtureServer}, use) => {
+    const built = await buildUnpackedExtension([
       fixtureServer.enabledOrigin,
       fixtureServer.deniedOrigin,
     ]);
+    await use(built);
+    await rm(built.directory, {recursive: true, force: true});
+  },
+
+  context: async ({unpackedExtension}, use, testInfo) => {
     const profileDir = await mkdtemp(join(tmpdir(), 'cliptown-profile-'));
     const context = await chromium.launchPersistentContext(profileDir, {
       channel: 'chromium',
       headless: testInfo.project.use.headless ?? true,
       args: [
-        `--disable-extensions-except=${extensionDir}`,
-        `--load-extension=${extensionDir}`,
+        `--disable-extensions-except=${unpackedExtension.directory}`,
+        `--load-extension=${unpackedExtension.directory}`,
         '--no-first-run',
         '--no-default-browser-check',
       ],
     });
     await use(context);
     await context.close();
-    await rm(extensionDir, {recursive: true, force: true});
     await rm(profileDir, {recursive: true, force: true});
   },
 
-  /** The extension's MV3 service worker, used to drive real background functions. */
-  worker: async ({context}, use) => {
-    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
-    // The worker only counts as ready once the privacy policy module has attached.
-    await expect
-      .poll(() => worker.evaluate(() => typeof globalThis.ClipTownBackgroundPolicy))
-      .toBe('object');
-    await use(worker);
+  extensionId: async ({unpackedExtension}, use) => {
+    await use(unpackedExtension.id);
   },
 
-  extensionId: async ({worker}, use) => {
-    await use(new URL(worker.url()).host);
+  /** The extension's MV3 service worker, used to drive real background functions. */
+  worker: async ({context, extensionId}, use) => {
+    const worker = new BackgroundWorker(context, extensionId);
+    // Ready means the privacy policy module attached and the install-time
+    // registration sync has drained, so it cannot race the test's own consent.
+    expect(await worker.evaluate(() => typeof globalThis.ClipTownBackgroundPolicy)).toBe('object');
+    await worker.evaluate(() => syncRegistrations());
+    await use(worker);
   },
 });
 
