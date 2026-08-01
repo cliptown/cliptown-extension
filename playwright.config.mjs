@@ -2,7 +2,7 @@ import {defineConfig} from '@playwright/test';
 
 export default defineConfig({
   testDir: './test/browser',
-  testMatch: process.env.PW_PROBE ? '**/*.probe.mjs' : '**/*.spec.mjs',
+  testMatch: '**/*.spec.mjs',
   // The extension is stateful per profile; a fresh context per test keeps them independent.
   fullyParallel: false,
   workers: 1,
