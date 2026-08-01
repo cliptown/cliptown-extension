@@ -94,42 +94,46 @@ async function disableOrigin(origin) {
   await chrome.permissions.remove({origins: [originPattern(normalized)]});
 }
 
-async function stageDraft(request, sender) {
-  const deniedOrigins = await getManagedDeniedOrigins();
-  const candidate = policy.draftCandidate(request, sender, await getOrigins(), deniedOrigins);
-  if (candidate.status !== 'staged') return candidate;
+function stageDraft(request, sender) {
+  return withSessionLock(async () => {
+    const deniedOrigins = await getManagedDeniedOrigins();
+    const candidate = policy.draftCandidate(request, sender, await getOrigins(), deniedOrigins);
+    if (candidate.status !== 'staged') return candidate;
 
-  const rateState = await chrome.storage.session.get(RATE_EVENTS_KEY);
-  const rate = policy.rateLimitDecision(
-    rateState[RATE_EVENTS_KEY],
-    candidate.draft.origin,
-    Date.now(),
-  );
-  await chrome.storage.session.set({[RATE_EVENTS_KEY]: rate.events});
-  if (!rate.allowed) return {status: 'denied', reason: 'rate-limited'};
+    const rateState = await chrome.storage.session.get(RATE_EVENTS_KEY);
+    const rate = policy.rateLimitDecision(
+      rateState[RATE_EVENTS_KEY],
+      candidate.draft.origin,
+      Date.now(),
+    );
+    await chrome.storage.session.set({[RATE_EVENTS_KEY]: rate.events});
+    if (!rate.allowed) return {status: 'denied', reason: 'rate-limited'};
 
-  const stored = await chrome.storage.session.get(SESSION_DRAFTS_KEY);
-  const drafts = Array.isArray(stored[SESSION_DRAFTS_KEY]) ? stored[SESSION_DRAFTS_KEY] : [];
-  const draft = {
-    id: crypto.randomUUID(),
-    ...candidate.draft,
-    updatedAt: new Date().toISOString(),
-  };
-  await chrome.storage.session.set({
-    [SESSION_DRAFTS_KEY]: policy.prependBoundedDraft(drafts, draft),
+    const stored = await chrome.storage.session.get(SESSION_DRAFTS_KEY);
+    const drafts = Array.isArray(stored[SESSION_DRAFTS_KEY]) ? stored[SESSION_DRAFTS_KEY] : [];
+    const draft = {
+      id: crypto.randomUUID(),
+      ...candidate.draft,
+      updatedAt: new Date().toISOString(),
+    };
+    await chrome.storage.session.set({
+      [SESSION_DRAFTS_KEY]: policy.prependBoundedDraft(drafts, draft),
+    });
+    return {status: 'staged'};
   });
-  return {status: 'staged'};
 }
 
-async function clearOriginDrafts(origin) {
+function clearOriginDrafts(origin) {
   const normalized = policy.normalizeWebOrigin(origin);
-  if (!normalized) return {status: 'ignored'};
-  const stored = await chrome.storage.session.get([SESSION_DRAFTS_KEY, RATE_EVENTS_KEY]);
-  await chrome.storage.session.set({
-    [SESSION_DRAFTS_KEY]: policy.clearOriginRecords(stored[SESSION_DRAFTS_KEY], normalized),
-    [RATE_EVENTS_KEY]: policy.clearOriginRecords(stored[RATE_EVENTS_KEY], normalized),
+  if (!normalized) return Promise.resolve({status: 'ignored'});
+  return withSessionLock(async () => {
+    const stored = await chrome.storage.session.get([SESSION_DRAFTS_KEY, RATE_EVENTS_KEY]);
+    await chrome.storage.session.set({
+      [SESSION_DRAFTS_KEY]: policy.clearOriginRecords(stored[SESSION_DRAFTS_KEY], normalized),
+      [RATE_EVENTS_KEY]: policy.clearOriginRecords(stored[RATE_EVENTS_KEY], normalized),
+    });
+    return {status: 'cleared'};
   });
-  return {status: 'cleared'};
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
