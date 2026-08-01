@@ -8,7 +8,12 @@ Consent-based local draft recovery for selected web origins.
 - Content scripts are registered dynamically after consent; there is no declared `<all_urls>` content script.
 - Managed `captureDeniedOrigins` policy overrides stored user consent and prevents script registration after browser restart.
 - Password, payment-card, one-time-code, passcode, identity, banking, private-key, seed-phrase, and recovery-code fields are excluded, as are disabled, read-only, and unsupported input fields.
-- Pages can opt sensitive editors out with `data-cliptown-ignore` or `data-private`.
+- Exclusion is decided from the label a user actually sees: the field's `name`, `id`, `aria-label`, `placeholder` and `title`, plus its associated `<label>` elements, any wrapping `<label>`, and any `aria-labelledby` targets.
+- Pages can opt sensitive editors out with `data-cliptown-ignore` or `data-private`, on the field itself **or on any ancestor**, so a wrapped rich-text editor can be excluded as a whole.
+- Only the extension's own pages may change consent or read/clear staged drafts; a content script that asks for a privileged action is refused as an untrusted sender.
+- Drafts are attributed to the origin of the document that sent them; a frame/tab origin mismatch or a subframe sender is refused.
+- Disabling an origin, or an administrator denying it, discards the plaintext already staged for that origin.
+- Capture registration is re-synchronised on startup, on install/update, when managed policy changes, and when a host permission is revoked from `chrome://extensions`.
 - Incognito tab senders are rejected again at the background-worker boundary, even if the user previously enabled the same ordinary origin.
 - Credential-bearing, malformed, browser-internal, file, FTP, and other non-web origins are rejected.
 - Navigation never inherits consent: every staged message is checked against the sender tab's current exact origin.
