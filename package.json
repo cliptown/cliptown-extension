@@ -6,9 +6,13 @@
     "check:syntax": "node --check background-policy.js && node --check background.js && node --check content.js && node --check policy.js && node --check popup.js",
     "check:manifest": "node scripts/validate-extension.mjs",
     "test": "node --test test/*.test.js",
+    "test:browser": "playwright test",
     "check": "npm run check:syntax && npm run check:manifest && npm test"
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
   }
 }
