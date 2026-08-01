@@ -63,6 +63,51 @@ test('honors page and administrator exclusion markers', () => {
   );
 });
 
+test('excludes fields protected by their visible label rather than their attributes', () => {
+  assert.equal(
+    policy.extractDraft(input({labels: [{textContent: 'Recovery code'}]})),
+    null,
+  );
+  assert.equal(
+    policy.extractDraft(input({
+      closest: (selector) => (selector === 'label' ? {textContent: 'Card number'} : null),
+    })),
+    null,
+  );
+  assert.equal(
+    policy.extractDraft(input({
+      getAttribute: (name) => (name === 'aria-labelledby' ? 'bank-label' : null),
+      ownerDocument: {
+        getElementById: (id) => (id === 'bank-label' ? {textContent: 'Bank account number'} : null),
+      },
+    })),
+    null,
+  );
+  assert.equal(policy.extractDraft(input({title: 'Enter your password'})), null);
+  assert.equal(
+    policy.extractDraft(input({labels: [{textContent: 'Message notes'}]})),
+    'recover this draft',
+  );
+});
+
+test('honors exclusion markers placed on an ancestor of the editor', () => {
+  assert.equal(
+    policy.extractDraft(input({
+      tagName: 'DIV',
+      isContentEditable: true,
+      closest: (selector) => (selector === '[data-private]' ? {} : null),
+    })),
+    null,
+  );
+  assert.equal(
+    policy.extractDraft(input({
+      closest: (selector) => (selector === '[data-cliptown-ignore]' ? {} : null),
+    })),
+    null,
+  );
+  assert.equal(policy.extractDraft(input({closest: () => null})), 'recover this draft');
+});
+
 test('rejects disabled, read-only, unsupported, and tiny fields', () => {
   assert.equal(policy.extractDraft(input({disabled: true})), null);
   assert.equal(policy.extractDraft(input({readOnly: true})), null);
