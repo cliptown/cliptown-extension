@@ -264,8 +264,8 @@ test.describe('origins without consent capture nothing', () => {
     });
 
     expect(response).toEqual({status: 'denied', reason: 'origin-not-enabled'});
-    const drafts = await stagedDrafts(worker);
-    expect(draftTexts(drafts)).toEqual(['captured while consent was active']);
+    // Withdrawing consent also discards the plaintext already staged for that origin.
+    expect(await stagedDrafts(worker)).toEqual([]);
   });
 });
 
