@@ -162,7 +162,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return {enabled: origin ? (await getEffectiveOrigins()).includes(origin) : false};
       }
       case 'clear_session_drafts':
-        await chrome.storage.session.remove([SESSION_DRAFTS_KEY, RATE_EVENTS_KEY]);
+        await withSessionLock(() =>
+          chrome.storage.session.remove([SESSION_DRAFTS_KEY, RATE_EVENTS_KEY]));
         return {status: 'cleared'};
       case 'clear_origin_drafts':
         return clearOriginDrafts(request.origin);
