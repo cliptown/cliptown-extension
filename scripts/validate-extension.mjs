@@ -37,6 +37,7 @@ const sources = ['background-policy.js', 'background.js', 'content.js', 'policy.
   .map((file) => readFileSync(file, 'utf8'))
   .join('\n');
 const background = readFileSync('background.js', 'utf8');
+const capturePolicy = readFileSync('policy.js', 'utf8');
 
 if (/console\.log\s*\(/.test(sources)) fail('plaintext console logging is forbidden');
 if (/<all_urls>/.test(sources) || /save_draft/.test(sources)) fail('legacy unconditional capture code remains');
