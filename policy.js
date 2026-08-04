@@ -102,9 +102,10 @@
 
   function isProtected(element) {
     const type = String(element?.type || '').toLowerCase();
-    const autocomplete = normalizeSensitiveText(
-      element?.autocomplete ?? attribute(element, 'autocomplete'),
-    );
+    const autocomplete = normalizeSensitiveText([
+      element?.autocomplete,
+      attribute(element, 'autocomplete'),
+    ].filter((value) => value != null).join(' '));
     const compactLabel = describingText(element).replace(/[^a-z0-9]+/g, '');
 
     return isExcludedByMarker(element) ||
