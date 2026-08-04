@@ -89,10 +89,7 @@ test('rejects sensitive wording supplied only by visible and ARIA labels', () =>
     })),
     null,
   );
-  assert.equal(
-    policy.extractDraft(input({title: 'Enter your password'})),
-    null,
-  );
+  assert.equal(policy.extractDraft(input({title: 'Enter your password'})), null);
 });
 
 test('normalizes invisible, full-width, bidi, control, and separator obfuscation', () => {
@@ -145,23 +142,26 @@ test('honors field and ancestor exclusion markers defensively', () => {
   );
 });
 
-test('bounds label traversal and rejects multiple ARIA references', () => {
-  const ownerDocument = {
-    getElementById(id) {
-      return id === 'secret-label' ? {textContent: 'Secret key'} : {textContent: 'Notes'};
-    },
-  };
+test('fails closed on excessive label and ARIA reference fan-out', () => {
+  assert.equal(
+    policy.extractDraft(input({labels: Array.from({length: 33}, () => ({textContent: 'Notes'}))})),
+    null,
+  );
   assert.equal(
     policy.extractDraft(input({
-      attributes: {'aria-labelledby': `notes ${'x '.repeat(40)} secret-label`},
-      ownerDocument,
+      attributes: {'aria-labelledby': Array.from({length: 33}, (_, index) => `label-${index}`).join(' ')},
+      ownerDocument: {getElementById: () => ({textContent: 'Notes'})},
     })),
-    'recover this draft',
+    null,
   );
   assert.equal(
     policy.extractDraft(input({
       attributes: {'aria-labelledby': 'notes secret-label'},
-      ownerDocument,
+      ownerDocument: {
+        getElementById(id) {
+          return id === 'secret-label' ? {textContent: 'Secret key'} : {textContent: 'Notes'};
+        },
+      },
     })),
     null,
   );
