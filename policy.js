@@ -5,6 +5,7 @@
 })(globalThis, function createPolicy() {
   const MAX_DRAFT_CHARS = 100000;
   const MAX_LABEL_CHARS = 300;
+  const MAX_DESCRIPTION_REFERENCES = 32;
   const PROTECTED_AUTOCOMPLETE = /(?:^|\s)(?:cc-|current-password|new-password|one-time-code|webauthn)/i;
   const PROTECTED_COMPACT_LABEL = /(?:password|passcode|otp|onetimecode|creditcard|cardnumber|securitycode|cvv|cvc|socialsecurity|ssn|taxid|routingnumber|bankaccount|privatekey|secretkey|apikey|seedphrase|recoverycode|authenticatorcode)/;
   const INVISIBLE_OR_CONTROL = /[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufeff\uffa0]/g;
@@ -45,6 +46,21 @@
       ancestor(element, IGNORE_SELECTOR) != null;
   }
 
+  function labelReferences(element) {
+    return String(attribute(element, 'aria-labelledby') || '')
+      .slice(0, 4096)
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function hasExcessiveDescriptionFanout(element) {
+    const labels = element?.labels;
+    const labelCount = labels && typeof labels.length === 'number' ? labels.length : 0;
+    return labelCount > MAX_DESCRIPTION_REFERENCES ||
+      labelReferences(element).length > MAX_DESCRIPTION_REFERENCES;
+  }
+
   function describingText(element) {
     const parts = [
       element?.name,
@@ -56,7 +72,7 @@
 
     const labels = element?.labels;
     if (labels && typeof labels.length === 'number') {
-      const count = Math.min(labels.length, 32);
+      const count = Math.min(labels.length, MAX_DESCRIPTION_REFERENCES);
       for (let index = 0; index < count; index += 1) {
         parts.push(labels[index]?.textContent, labels[index]?.innerText);
       }
@@ -65,15 +81,9 @@
     const parentLabel = ancestor(element, 'label');
     parts.push(parentLabel?.textContent, parentLabel?.innerText);
 
-    const labelledBy = String(attribute(element, 'aria-labelledby') || '')
-      .slice(0, MAX_LABEL_CHARS)
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 32);
     const document = element?.ownerDocument;
     if (typeof document?.getElementById === 'function') {
-      for (const id of labelledBy) {
+      for (const id of labelReferences(element).slice(0, MAX_DESCRIPTION_REFERENCES)) {
         const label = document.getElementById(id);
         parts.push(label?.textContent, label?.innerText);
       }
@@ -98,6 +108,7 @@
     const compactLabel = describingText(element).replace(/[^a-z0-9]+/g, '');
 
     return isExcludedByMarker(element) ||
+      hasExcessiveDescriptionFanout(element) ||
       type === 'password' ||
       PROTECTED_AUTOCOMPLETE.test(autocomplete) ||
       PROTECTED_COMPACT_LABEL.test(compactLabel);
