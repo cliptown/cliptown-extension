@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ClipTown Unicode privacy fixture</title>
+</head>
+<body>
+  <h1>Unicode privacy fixture</h1>
+
+  <p>
+    <label for="fullwidth-secret">ｒｅｃｏｖｅｒｙ　ｃｏｄｅ</label>
+    <input id="fullwidth-secret" name="ordinary-field-a" type="text">
+  </p>
+
+  <p>
+    <label for="zero-width-secret">Security value</label>
+    <input id="zero-width-secret" name="pa&#8203;ssword" type="text">
+  </p>
+
+  <p>
+    <label for="separator-secret">Protected value</label>
+    <input id="separator-secret" name="ordinary-field-b" aria-label="s.e.e.d p.h.r.a.s.e" type="text">
+  </p>
+
+  <p>
+    <label for="autocomplete-secret">Verification value</label>
+    <input id="autocomplete-secret" name="ordinary-field-c" autocomplete="one-&#8203;time-code" type="text">
+  </p>
+
+  <p>
+    <label for="canary">Meeting notes</label>
+    <textarea id="canary" name="meeting-notes"></textarea>
+  </p>
+
+  <button id="elsewhere" type="button">Move focus here</button>
+</body>
+</html>
