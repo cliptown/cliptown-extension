@@ -43,7 +43,9 @@
       element?.dataset?.private != null ||
       attribute(element, 'data-cliptown-ignore') != null ||
       attribute(element, 'data-private') != null ||
-      ancestor(element, IGNORE_SELECTOR) != null;
+      ancestor(element, IGNORE_SELECTOR) != null ||
+      ancestor(element, '[data-cliptown-ignore]') != null ||
+      ancestor(element, '[data-private]') != null;
   }
 
   function labelReferences(element) {
