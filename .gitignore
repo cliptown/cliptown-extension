@@ -5,3 +5,7 @@ playwright-report/
 blob-report/
 .playwright/
 *.log
+tmp
+temp
+tmp/worktrees
+temp/worktrees
