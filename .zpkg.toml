@@ -1,0 +1,29 @@
+[package]
+org = "cliptown"
+name = "cliptown-extension"
+version = "0.1.0"
+description = "Browser extension for encrypted ClipTown capture, recovery, and synchronization workflows"
+license = "MIT"
+language = "javascript"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/cliptown/cliptown-extension"
+
+[install]
+dir = ".vendor/.zed"
+
+[dependencies]
+"cliptown/cliptown-clients" = "^0.1.0"
+"cliptown/cliptown-interfaces" = "^0.1.0"
+# Keep this draft blocked until cliptown-monorepo#15 creates and publishes them.
+"cliptown/cliptown-lib" = "^0.1.0"
+"cliptown/cliptown-sync" = "^0.1.0"
+
+[publish]
+include_readme = true
+tag_format = "v{version}"
+exclude = [".env", ".env.*", "node_modules/**", "dist/**", "tmp/**", "**/*.log", ".vendor/.zed/**", "test-results/**", "playwright-report/**", ".DS_Store"]
+
+[scripts]
+test = "npm test"
