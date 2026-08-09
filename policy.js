@@ -43,7 +43,9 @@
       element?.dataset?.private != null ||
       attribute(element, 'data-cliptown-ignore') != null ||
       attribute(element, 'data-private') != null ||
-      ancestor(element, IGNORE_SELECTOR) != null;
+      ancestor(element, IGNORE_SELECTOR) != null ||
+      ancestor(element, '[data-cliptown-ignore]') != null ||
+      ancestor(element, '[data-private]') != null;
   }
 
   function labelReferences(element) {
@@ -90,6 +92,37 @@
     }
 
     return parts.map(normalizeSensitiveText).join(' ');
+  }
+
+  function normalizeSensitiveText(value) {
+    return String(value || '')
+      .normalize('NFKC')
+      .replace(INVISIBLE_OR_CONTROL, '')
+      .toLowerCase();
+  }
+
+  function associatedLabelText(element) {
+    const values = [];
+    for (const label of Array.from(element?.labels || [])) {
+      values.push(label?.textContent, label?.innerText);
+    }
+
+    const parentLabel = element?.closest?.('label');
+    if (parentLabel && parentLabel !== element) {
+      values.push(parentLabel.textContent, parentLabel.innerText);
+    }
+
+    const labelledBy = String(element?.getAttribute?.('aria-labelledby') || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const document = element?.ownerDocument;
+    for (const id of labelledBy) {
+      const label = document?.getElementById?.(id);
+      values.push(label?.textContent, label?.innerText);
+    }
+
+    return values.filter((value) => value != null).join(' ');
   }
 
   function isEditable(element) {
