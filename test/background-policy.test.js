@@ -129,22 +129,32 @@ test('resolves the sending document origin ahead of the tab origin', () => {
   assert.equal(policy.senderOrigin({tab: {url: 'https://example.com'}}).origin, 'https://example.com');
 });
 
-test('stages bounded drafts with normalized metadata for enabled origins', () => {
+test('stages bounded drafts with recognized metadata for enabled origins', () => {
   const result = policy.draftCandidate(
-    request({
-      text: 'a'.repeat(policy.MAX_DRAFT_CHARS + 50),
-      reason: 'unexpected-reason',
-      fieldKind: 'custom-editor',
-    }),
+    request({text: 'a'.repeat(policy.MAX_DRAFT_CHARS + 50)}),
     sender(),
     ['https://example.com'],
   );
 
   assert.equal(result.status, 'staged');
   assert.equal(result.draft.origin, 'https://example.com');
-  assert.equal(result.draft.reason, 'unknown');
-  assert.equal(result.draft.fieldKind, 'unknown');
+  assert.equal(result.draft.reason, 'idle');
+  assert.equal(result.draft.fieldKind, 'textarea');
   assert.equal(result.draft.text.length, policy.MAX_DRAFT_CHARS);
+});
+
+test('rejects unrecognized capture reasons and field kinds before storage', () => {
+  for (const invalid of [
+    {reason: 'unknown'},
+    {fieldKind: 'password'},
+    {fieldKind: 'custom-editor'},
+    {reason: '', fieldKind: 'textarea'},
+  ]) {
+    assert.deepEqual(
+      policy.draftCandidate(request(invalid), sender(), ['https://example.com']),
+      {status: 'denied', reason: 'unsupported-capture-metadata'},
+    );
+  }
 });
 
 test('accepts only the known capture reasons and field kinds', () => {
