@@ -225,3 +225,12 @@ test('bounds staged plaintext before session handoff', () => {
   );
   assert.equal(draft.length, policy.MAX_DRAFT_CHARS);
 });
+
+test('fails closed on oversized field and label descriptions', () => {
+  assert.equal(policy.extractDraft(input({name: 'notes'.repeat(100) + 'password'})), null);
+  assert.equal(policy.extractDraft(input({labels: [{textContent: 'notes '.repeat(100)}]})), null);
+  assert.equal(policy.extractDraft(input({
+    attributes: {'aria-labelledby': 'note '.repeat(900)},
+  })), null);
+  assert.equal(policy.extractDraft(input({name: 'Short note'})), 'recover this draft');
+});
