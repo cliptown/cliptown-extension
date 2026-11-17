@@ -82,12 +82,17 @@
 
     const requestedReason = String(request?.reason || '');
     const requestedFieldKind = String(request?.fieldKind || '');
+    // Only the installed content-script protocol may stage plaintext.
+    // Unknown metadata must not be silently normalized into an accepted draft.
+    if (!ALLOWED_REASONS.has(requestedReason) || !ALLOWED_FIELD_KINDS.has(requestedFieldKind)) {
+      return {status: 'denied', reason: 'unsupported-capture-metadata'};
+    }
     return {
       status: 'staged',
       draft: {
         origin,
-        reason: ALLOWED_REASONS.has(requestedReason) ? requestedReason : 'unknown',
-        fieldKind: ALLOWED_FIELD_KINDS.has(requestedFieldKind) ? requestedFieldKind : 'unknown',
+        reason: requestedReason,
+        fieldKind: requestedFieldKind,
         text,
       },
     };
